@@ -48,16 +48,35 @@ function fetchRustChannels() {
   return Promise.all(promises).then(data => new Map(data));
 }
 
-function populateChannels(channels) {
-  console.log(channels);
+function fetchRustMilestones() {
+  return fetch('https://api.github.com/repos/rust-lang/rust/milestones')
+    .then(res => res.json())
+    .then(data => {
+      let milestones = new Map();
+      for (let milestone of data) {
+        if (milestone.title.match(/\d+\.\d+/)) {
+          milestones.set(milestone.title + '.0', milestone.due_on.substr(0, 10));
+        }
+      }
+      return milestones;
+    });
+}
+
+function populateChannels(channels, milestones) {
+  console.log(`populateChannels(${channels}, ${milestones})`);
   for (let [chan, data] of channels) {
+    let version = data.version.split('-')[0];
     let li = document.getElementById(chan);
-    var channel_s = document.createElement("span");
-    channel_s.textContent = `${chan}: ${data.version} (released ${data.release_date})`;
+    let channel_s = document.createElement("span");
+    let release = `released ${data.release_date}`;
+    if (milestones.has(version)) {
+      release = `expected release date ${milestones.get(version)}`;
+    }
+    channel_s.textContent = `${chan}: ${version} (${release})`;
     li.appendChild(channel_s);
   }
 }
 
-Promise.all([domLoaded, fetchRustChannels()])
-  .then(data => populateChannels(data[1]))
+Promise.all([domLoaded, fetchRustChannels(), fetchRustMilestones()])
+  .then(([_, channels, milestones]) => populateChannels(channels, milestones))
   .catch(console.error);
